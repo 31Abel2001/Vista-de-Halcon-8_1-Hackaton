@@ -1,4 +1,4 @@
-package com.example.vista_halcon_hackaton
+package com.utc.vistadehalcon
 
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey

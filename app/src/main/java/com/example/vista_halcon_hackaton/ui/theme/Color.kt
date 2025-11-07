@@ -1,4 +1,4 @@
-package com.example.vista_halcon_hackaton.ui.theme
+package com.utc.vistadehalcon.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

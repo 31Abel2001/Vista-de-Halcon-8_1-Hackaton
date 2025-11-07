@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.vista_halcon_hackaton"
+    namespace = "com.utc.vistadehalcon"
     compileSdk {
         version = release(36)
     }
