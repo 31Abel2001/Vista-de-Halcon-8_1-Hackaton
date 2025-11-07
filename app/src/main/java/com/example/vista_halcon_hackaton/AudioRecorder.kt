@@ -4,24 +4,29 @@ import android.content.Context
 import android.media.MediaRecorder
 import android.os.Environment
 import java.io.File
-import java.io.IOException
 
 class AudioRecorder(private val context: Context) {
-    private var recorder: MediaRecorder? = null
+    private var mediaRecorder: MediaRecorder? = null
     private var outputFile: String? = null
 
     fun startRecording(): String? {
-        return try {
-            val fileName = "audio_${System.currentTimeMillis()}.mp3"
-            val fileDir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
-            if (fileDir == null) {
-                println("No se pudo acceder al directorio de música.")
-                return null
-            }
-            val file = File(fileDir, fileName)
-            outputFile = file.absolutePath
+        try {
+            // Carpeta donde se guardará el archivo
+            val voiceNotesDir = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
+                "Notas de voz"
+            )
 
-            recorder = MediaRecorder().apply {
+            if (!voiceNotesDir.exists()) {
+                voiceNotesDir.mkdirs()
+            }
+
+            // Nombre del archivo
+            val fileName = "Grabacion_${System.currentTimeMillis()}.mp3"
+            outputFile = File(voiceNotesDir, fileName).absolutePath
+
+            // Configurar MediaRecorder
+            mediaRecorder = MediaRecorder().apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
@@ -30,23 +35,22 @@ class AudioRecorder(private val context: Context) {
                 start()
             }
 
-            outputFile
+            return outputFile
         } catch (e: Exception) {
             e.printStackTrace()
-            null
+            return null
         }
     }
 
     fun stopRecording() {
         try {
-            recorder?.apply {
+            mediaRecorder?.apply {
                 stop()
                 release()
             }
+            mediaRecorder = null
         } catch (e: Exception) {
             e.printStackTrace()
-        } finally {
-            recorder = null
         }
     }
 }

@@ -1,4 +1,5 @@
 package com.utc.vistadehalcon
+
 import androidx.compose.ui.platform.LocalContext
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -12,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -19,6 +22,7 @@ import com.utc.vistadehalcon.ui.theme.VistaDeHalconTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     private lateinit var sessionManager: SessionManager
@@ -33,7 +37,6 @@ class MainActivity : ComponentActivity() {
                 AppNavigator(
                     isLoggedIn = isLoggedIn,
                     onLogin = {
-                        // Guardar sesión
                         CoroutineScope(Dispatchers.IO).launch {
                             sessionManager.setLoggedIn(true)
                         }
@@ -169,6 +172,9 @@ fun HomeScreen(onLogout: () -> Unit) {
     var isRecording by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
     var recordedFilePath by remember { mutableStateOf<String?>(null) }
+    var isCountingDown by remember { mutableStateOf(false) }
+    var countdown by remember { mutableStateOf(3) }
+    var cancelRequested by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         val permissions = arrayOf(
@@ -182,53 +188,116 @@ fun HomeScreen(onLogout: () -> Unit) {
         )
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+        contentAlignment = Alignment.Center
     ) {
-        Text("Bienvenido a la pantalla principal")
+        Column(
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Bienvenido a la pantalla principal")
 
-        Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-        Button(
-            onClick = {
-                try {
-                    if (!isRecording) {
-                        val filePath = recorder.startRecording()
-                        if (filePath != null) {
-                            recordedFilePath = filePath
-                            message = "Grabando... archivo: ${filePath.substringAfterLast('/')}"
-                            isRecording = true
-                        } else {
-                            message = "Error al iniciar grabación (verifica permisos)."
+            // Botón principal
+            Button(
+                onClick = {
+                    if (!isRecording && !isCountingDown) {
+                        isCountingDown = true
+                        cancelRequested = false
+                        countdown = 3
+                        message = "Grabación iniciará en $countdown..."
+
+                        CoroutineScope(Dispatchers.Main).launch {
+                            for (i in 3 downTo 1) {
+                                if (cancelRequested) break
+                                countdown = i
+                                message = "Grabación iniciará en $i..."
+                                delay(1000L)
+                            }
+
+                            if (!cancelRequested) {
+                                try {
+                                    val filePath = recorder.startRecording()
+                                    if (filePath != null) {
+                                        recordedFilePath = filePath
+                                        message =
+                                            "Grabando... archivo: ${filePath.substringAfterLast('/')}"
+                                        isRecording = true
+                                    } else {
+                                        message =
+                                            "Error al iniciar grabación (verifica permisos)."
+                                    }
+                                } catch (e: Exception) {
+                                    message = "Error: ${e.message}"
+                                } finally {
+                                    isCountingDown = false
+                                }
+                            } else {
+                                isCountingDown = false
+                                message = "Grabación cancelada."
+                            }
                         }
-                    } else {
+                    } else if (isRecording) {
                         recorder.stopRecording()
-                        message = "Grabación detenida.\nArchivo: ${recordedFilePath ?: "desconocido"}"
+                        message =
+                            "Grabación detenida.\nArchivo: ${recordedFilePath ?: "desconocido"}"
                         isRecording = false
                     }
-                } catch (e: Exception) {
-                    message = "Error: ${e.message}"
-                    e.printStackTrace()
+                },
+                enabled = !isCountingDown
+            ) {
+                Text(
+                    when {
+                        isCountingDown -> "Esperando..."
+                        !isRecording -> "Iniciar alerta"
+                        else -> "Detener grabación"
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 🔴 Botón de cancelar visible solo durante conteo
+            if (isCountingDown) {
+                Button(
+                    onClick = {
+                        cancelRequested = true
+                        isCountingDown = false
+                        message = "Grabación cancelada."
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Cancelar", color = MaterialTheme.colorScheme.onError)
                 }
             }
-        ) {
-            Text(if (!isRecording) "Iniciar alerta" else "Detener grabación")
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(onClick = { onLogout() }) {
+                Text("Cerrar sesión")
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (message.isNotEmpty()) {
+                Text(message)
+            }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(onClick = { onLogout() }) {
-            Text("Cerrar sesión")
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (message.isNotEmpty()) {
-            Text(message)
+        // 🔢 Mostrar número grande del conteo en el centro
+        if (isCountingDown && !cancelRequested) {
+            Text(
+                text = countdown.toString(),
+                fontSize = 80.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.Center)
+            )
         }
     }
 }
